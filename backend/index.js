@@ -37,16 +37,50 @@ app.get('/citas', (req, res) => {
 });
 
 // 🔴 NUEVO: Ruta para CREAR una nueva cita (Método POST)
-app.post('/citas', (req, res) => {
-  const nuevaCita = req.body; // Aquí llega la información que el usuario escribe
+/* app.post('/citas', (req, res) => {
+  const nuevaCita = req.body; */ // Aquí llega la información que el usuario escribe
   
   // Por ahora, una lógica ultra básica: le asignamos un ID aleatorio y la guardamos
+  /* nuevaCita.id = `cita_${Math.floor(Math.random() * 1000)}`;
+  nuevaCita.estado = "confirmada"; */
+
+  /*  citas.push(nuevaCita); // La metemos a la lista
+
+  // Respondemos que todo salió bien y devolvemos la cita creada
+  /* res.status(201).json({
+    mensaje: "¡Cita agendada con éxito!",
+    cita: nuevaCita
+  });
+}); */
+
+app.post('/citas', (req, res) => {
+  const nuevaCita = req.body; 
+  
+  // EXTRAER los datos que nos envía el cliente para analizarlos
+  const { estilista_id, fecha, hora_inicio } = nuevaCita;
+
+  // 🔍 EL DETECTIVE: Buscamos si ya existe una cita idéntica
+  const citaExistente = citas.find(cita => 
+    cita.estilista_id === estilista_id && 
+    cita.fecha === fecha && 
+    cita.hora_inicio === hora_inicio
+  );
+
+  // 🚦 EVALUACIÓN LÓGICA: Si el detective encontró algo...
+  if (citaExistente) {
+    // Detenemos la ejecución aquí y devolvemos un código de error 400 (Bad Request)
+    return res.status(400).json({
+      error: "Horario no disponible",
+      mensaje: `La estilista elegida ya tiene una cita asignada para el día ${fecha} a las ${hora_inicio}.`
+    });
+  }
+
+  // Si el detective NO encontró nada, la lógica continúa normalmente:
   nuevaCita.id = `cita_${Math.floor(Math.random() * 1000)}`;
   nuevaCita.estado = "confirmada";
 
-  citas.push(nuevaCita); // La metemos a la lista
+  citas.push(nuevaCita); 
 
-  // Respondemos que todo salió bien y devolvemos la cita creada
   res.status(201).json({
     mensaje: "¡Cita agendada con éxito!",
     cita: nuevaCita
