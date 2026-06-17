@@ -1,94 +1,92 @@
-// 1. Traemos la librería Express que acabamos de instalar
 const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
-// 2. Inicializamos nuestra aplicación Express
 const app = express();
-
-// 3. Definimos el puerto (la "puerta" de tu computadora por donde escuchará la app)
 const PORT = 3000;
 
-// 🔴 NUEVO: Esto le permite a Express entender el formato JSON que le envíe el frontend
 app.use(express.json());
 
-// 4. Simulamos nuestra base de datos con el catálogo de estilistas que diseñamos
+// 🔐 TUS CREDENCIALES (Mantén las tuyas aquí)
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY; 
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 📌 El catálogo de estilistas se queda igual por ahora
 const estilistas = [
   { id: "est_01", nombre: "Jenny", especialidad: "Color y Cortes de dama" },
   { id: "est_02", nombre: "Marcela", especialidad: "Manicure y Peinados" }
 ];
 
-// 🔴 NUEVO: Aquí guardaremos las citas temporalmente en la memoria de la computadora
-const citas = [];
-
-// 5. Creamos nuestra primera "Ruta" (Endpoint). 
-// Cuando el frontend pida entrar a la raíz '/', el backend responderá un saludo.
 app.get('/', (req, res) => {
   res.send('¡Bienvenido al servidor del Salón de Belleza!');
 });
 
-// 6. Creamos la ruta para ver a las estilistas
-// Cuando el frontend consulte '/estilistas', le enviaremos la lista en formato JSON.
 app.get('/estilistas', (req, res) => {
   res.json(estilistas);
 });
 
-// 🔴 NUEVO: Ruta para VER las citas guardadas (Método GET)
-app.get('/citas', (req, res) => {
-  res.json(citas);
+
+// ============================================================
+// 🔄 REMPLAZA DESDE AQUÍ HACIA ABAJO (Rutas conectadas a Supabase)
+// ============================================================
+
+// 📋 Ruta para VER las citas desde Supabase (Método GET)
+app.get('/citas', async (req, res) => {
+  const { data, error } = await supabase
+    .from('citas')
+    .select('*');
+
+  if (error) {
+    return res.status(500).json({ error: "No se pudieron obtener las citas", detalles: error.message });
+  }
+
+  res.json(data);
 });
 
-// 🔴 NUEVO: Ruta para CREAR una nueva cita (Método POST)
-/* app.post('/citas', (req, res) => {
-  const nuevaCita = req.body; */ // Aquí llega la información que el usuario escribe
-  
-  // Por ahora, una lógica ultra básica: le asignamos un ID aleatorio y la guardamos
-  /* nuevaCita.id = `cita_${Math.floor(Math.random() * 1000)}`;
-  nuevaCita.estado = "confirmada"; */
+// ➕ Ruta para CREAR una nueva cita en Supabase (Método POST)
+app.post('/citas', async (req, res) => {
+  const { cliente_nombre, servicio, estilista_id, fecha, hora_inicio } = req.body;
 
-  /*  citas.push(nuevaCita); // La metemos a la lista
+  // 🔍 Detective en la nube
+  const { data: citasExistentes, error: errorBusqueda } = await supabase
+    .from('citas')
+    .select('*')
+    .eq('estilista_id', estilista_id)
+    .eq('fecha', fecha)
+    .eq('hora_inicio', hora_inicio);
 
-  // Respondemos que todo salió bien y devolvemos la cita creada
-  /* res.status(201).json({
-    mensaje: "¡Cita agendada con éxito!",
-    cita: nuevaCita
-  });
-}); */
+  if (errorBusqueda) {
+    return res.status(500).json({ error: "Error al validar la disponibilidad", detalles: errorBusqueda.message });
+  }
 
-app.post('/citas', (req, res) => {
-  const nuevaCita = req.body; 
-  
-  // EXTRAER los datos que nos envía el cliente para analizarlos
-  const { estilista_id, fecha, hora_inicio } = nuevaCita;
-
-  // 🔍 EL DETECTIVE: Buscamos si ya existe una cita idéntica
-  const citaExistente = citas.find(cita => 
-    cita.estilista_id === estilista_id && 
-    cita.fecha === fecha && 
-    cita.hora_inicio === hora_inicio
-  );
-
-  // 🚦 EVALUACIÓN LÓGICA: Si el detective encontró algo...
-  if (citaExistente) {
-    // Detenemos la ejecución aquí y devolvemos un código de error 400 (Bad Request)
+  if (citasExistentes && citasExistentes.length > 0) {
     return res.status(400).json({
       error: "Horario no disponible",
-      mensaje: `La estilista elegida ya tiene una cita asignada para el día ${fecha} a las ${hora_inicio}.`
+      mensaje: "La estilista elegida ya tiene una cita asignada para esa fecha y hora."
     });
   }
 
-  // Si el detective NO encontró nada, la lógica continúa normalmente:
-  nuevaCita.id = `cita_${Math.floor(Math.random() * 1000)}`;
-  nuevaCita.estado = "confirmada";
+  // 📝 Guardar en la base de datos real
+  const { data: nuevaCita, error: errorInsercion } = await supabase
+    .from('citas')
+    .insert([
+      { cliente_nombre, servicio, estilista_id, fecha, hora_inicio }
+    ])
+    .select(); 
 
-  citas.push(nuevaCita); 
+  if (errorInsercion) {
+    return res.status(500).json({ error: "No se pudo agendar la cita", detalles: errorInsercion.message });
+  }
 
   res.status(201).json({
-    mensaje: "¡Cita agendada con éxito!",
-    cita: nuevaCita
+    mensaje: "¡Cita agendada con éxito en la nube!",
+    cita: nuevaCita[0]
   });
 });
 
-// 7. Le decimos al servidor que empiece a escuchar las peticiones
+// 🚀 Encendido del servidor
 app.listen(PORT, () => {
   console.log(`Servidor corriendo con éxito en http://localhost:${PORT}`);
 });
-
