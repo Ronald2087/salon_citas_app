@@ -1,10 +1,12 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 const PORT = 3000;
 
+app.use(cors());
 app.use(express.json());
 
 // 🔐 TUS CREDENCIALES (Mantén las tuyas aquí)
